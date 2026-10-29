@@ -1,0 +1,81 @@
+# ORÁCULO — Dockerfile para simular Termux no CI
+# Usa ubuntu com pacotes similares ao Termux
+
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TERMUX_PREFIX=/data/data/com.termux/files/usr
+ENV PATH="${TERMUX_PREFIX}/bin:${PATH}"
+
+# Cria estrutura Termux-like
+RUN mkdir -p ${TERMUX_PREFIX}/bin ${TERMUX_PREFIX}/lib ${TERMUX_PREFIX}/include
+
+# Instala dependências base
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    git \
+    wget \
+    curl \
+    ffmpeg \
+    sox \
+    android-tools-adb \
+    android-tools-fastboot \
+    clang \
+    cmake \
+    make \
+    pkg-config \
+    libffi-dev \
+    libssl-dev \
+    zlib1g-dev \
+    libncurses5-dev \
+    libncursesw5-dev \
+    libreadline-dev \
+    libsqlite3-dev \
+    libxml2-dev \
+    libxslt-dev \
+    patchelf \
+    ccache \
+    jq \
+    htop \
+    ncurses-bin \
+    unzip \
+    zip \
+    openjdk-17-jdk-headless \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Configura Java
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
+
+# Cria usuário termux (sem senha)
+RUN useradd -m -s /bin/bash termux && \
+    echo "termux ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Simula termux-api endpoints (stubs para CI)
+RUN mkdir -p /usr/local/bin
+COPY docker/termux-api-stubs/* /usr/local/bin/
+RUN chmod +x /usr/local/bin/termux-*
+
+# Define diretório de trabalho
+WORKDIR /home/oraculo
+
+# Copia projeto
+COPY --chown=termux:termux . .
+
+# Instala dependências Python
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install -r requirements.txt
+
+# Compila llama-cpp-python (CPU)
+RUN pip install llama-cpp-python --no-binary llama-cpp-python
+
+# Usuário não-root
+USER termux
+ENV HOME=/home/termux
+
+# Entry point
+ENTRYPOINT ["python", "-m", "oraculo"]
+CMD ["--diagnostico"]

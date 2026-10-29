@@ -1,0 +1,616 @@
+================================================================================
+                    TUTORIAL COMPLETO — ORÁCULO NO TERMUX
+              Agente de IA 100% Offline para Android (Sem PC, Sem Root)
+================================================================================
+
+Este tutorial ensina TUDO: instalar, configurar, usar, corrigir erros, adicionar
+funcionalidades e compilar o APK — tudo direto no seu celular Android via Termux.
+
+--------------------------------------------------------------------------------
+SUMÁRIO
+--------------------------------------------------------------------------------
+1. REQUISITOS MÍNIMOS
+2. INSTALAÇÃO DO TERMUX (F-Droid/GitHub — NÃO Play Store)
+3. INSTALAÇÃO DO PROJETO ORÁCULO
+4. DOWNLOAD DOS MODELOS (LLM, STT, TTS, EMBEDDINGS)
+5. CONFIGURAÇÃO ADB WIRELESS (PARA WHATSAPP)
+6. TESTES ISOLADOS (ANTES DE RODAR O AGENTE)
+7. RODANDO O AGENTE ORÁCULO
+8. COMANDOS DE VOZ — EXEMPLOS PRÁTICOS
+9. EDITANDO CONFIGURAÇÃO POR VOZ (SEM CÓDIGO)
+10. BLINDAGEM ANDROID 12+ (EVITA MORTE DO PROCESSO)
+11. COMPILANDO APK NO PRÓPRIO CELULAR (BUILDOZER)
+12. BACKUP E RESTAURAÇÃO
+13. SOLUÇÃO DE PROBLEMAS (15 ERROS COMUNS)
+14. ADICIONANDO NOVAS FUNCIONALIDADES
+15. RESET TOTAL (SE BAGUNÇAR TUDO)
+16. ESTRUTURA DE ARQUIVOS — O QUE CADA COISA FAZ
+
+================================================================================
+1. REQUISITOS MÍNIMOS
+================================================================================
+
+| Componente        | Mínimo          | Recomendado       |
+|-------------------|-----------------|-------------------|
+| Android           | 11 (API 30)     | 13+ (API 33+)     |
+| RAM               | 4 GB            | 6-8 GB            |
+| Armazenamento livre | 8 GB          | 16 GB             |
+| Arquitetura       | arm64-v8a       | arm64-v8a         |
+| Root              | NÃO necessário  | NÃO necessário    |
+
+> ⚠️ Android 12+ tem "Phantom Process Killer" que mata apps em background.
+> O projeto inclui blindagem (wakelock, notificação foreground, Termux:Boot).
+
+--------------------------------------------------------------------------------
+2. INSTALAÇÃO DO TERMUX (OBRIGATÓRIO: F-Droid OU GitHub)
+================================================================================
+
+NÃO USE A VERSÃO DA PLAY STORE — ela é antiga (2020) e QUEBRA o termux-api.
+
+OPÇÃO A — F-Droid (Recomendado, atualiza automático):
+1. Baixe F-Droid: https://f-droid.org/FDroid.apk
+2. Instale o APK (permita "Instalar apps desconhecidos")
+3. Abra F-Droid → Atualize repositórios (puxe para baixo)
+4. Busque "Termux" → Instale
+5. Busque "Termux:API" → Instale (app companheiro, NÃO o plugin)
+
+OPÇÃO B — GitHub (Direto):
+1. Acesse: https://github.com/termux/termux-app/releases
+2. Baixe: `termux-app_v0.119.1-beta_apk-arm64-v8a.apk` (ou versão mais nova)
+3. Instale
+4. Baixe Termux:API: https://github.com/termux/termux-api/releases
+5. Instale: `termux-api_v0.5.1_apk-arm64-v8a.apk`
+
+VERIFICAÇÃO:
+- Abra Termux → digite `termux-api` → deve mostrar ajuda, não "command not found"
+- Digite `pkg update && pkg upgrade -y` → deve funcionar
+
+--------------------------------------------------------------------------------
+3. INSTALAÇÃO DO PROJETO ORÁCULO
+================================================================================
+
+No Termux, execute UMA LINHA POR VEZ (copie e cole):
+
+```bash
+# Atualiza pacotes
+pkg update && pkg upgrade -y
+
+# Instala dependências base
+pkg install -y git python ffmpeg sox termux-api android-tools clang cmake make wget curl unzip htop ncurses-utils jq
+
+# Atualiza pip
+pip install --upgrade pip setuptools wheel
+
+# Clona o projeto
+git clone https://github.com/SEU_USUARIO/oraculo-termux.git
+cd oraculo-termux
+
+# Torna scripts executáveis
+chmod +x scripts/*.sh
+
+# Executa instalador automático (instala dependências Python, compila llama-cpp)
+bash scripts/install_termux.sh
+```
+
+O QUE O `install_termux.sh` FAZ:
+- Instala pacotes Termux necessários
+- Instala dependências Python (requirements.txt)
+- Compila `llama-cpp-python` no celular (CPU, tenta Vulkan se disponível)
+- Cria pastas: models/, memory/, backups/, logs/
+- Verifica endpoints Termux:API
+
+> ⏱️ TEMPO: 10-30 min dependendo do celular (compilação do llama-cpp-python).
+> 🔌 MANTENHA O CELULAR CARREGANDO E TELA LIGADA.
+
+--------------------------------------------------------------------------------
+4. DOWNLOAD DOS MODELOS
+================================================================================
+
+O script `download_models.sh` baixa tudo do Hugging Face.
+
+OPÇÕES RECOMENDADAS (escolha UMA combinação):
+
+| Perfil           | LLM (3B-4B)           | STT             | TTS             | RAM Mín | Espaço |
+|------------------|-----------------------|-----------------|-----------------|---------|--------|
+| Leve/Rápido      | phi-4-mini-q4 (1.8GB) | whisper_tiny    | piper_low       | 3 GB    | 4 GB   |
+| EQUILIBRADO ⭐   | qwen2.5-3b-q4 (2.1GB) | whisper_base    | piper_medium    | 4 GB    | 6 GB   |
+| Qualidade Máxima | gemma-3-4b-q4 (2.5GB) | whisper_small   | piper_high      | 6 GB    | 10 GB  |
+
+COMANDOS (escolha um):
+
+```bash
+# EQUILIBRADO (recomendado para a maioria)
+bash scripts/download_models.sh --llm qwen2.5-3b-q4 --stt whisper_base --tts piper_medium --embeddings
+
+# LEVE (celulares com 4GB RAM)
+bash scripts/download_models.sh --llm phi-4-mini-q4 --stt whisper_tiny --tts piper_low --embeddings
+
+# QUALIDADE MÁXIMA (6GB+ RAM)
+bash scripts/download_models.sh --llm gemma-3-4b-q4 --stt whisper_small --tts piper_high --embeddings
+
+# BAIXA TUDO (você escolhe depois no config.yaml)
+bash scripts/download_models.sh --all
+```
+
+VERIFICAÇÃO:
+```bash
+ls -la models/llm/ models/stt/ models/tts/ models/embeddings/
+# Deve mostrar arquivos .gguf, .bin, .onnx, .json
+```
+
+> ⚠️ MODELOS SÃO GRANDES (2-10 GB total). Use Wi-Fi.
+> 📁 Ficam em `models/` (não vão para o Git, estão no .gitignore).
+
+--------------------------------------------------------------------------------
+5. CONFIGURAÇÃO ADB WIRELESS (OBRIGATÓRIO PARA WHATSAPP)
+================================================================================
+
+O ADB Wireless permite controlar o WhatsApp (toques, digitação, verificação visual)
+direto do Termux, SEM PC, SEM CABO, SEM ROOT. Requer Android 11+.
+
+```bash
+bash scripts/setup_adb_wireless.sh
+```
+
+O SCRIPT VAI TE GUIAR:
+1. Ative "Opções do desenvolvedor" (Config → Sobre → Toque 7x em "Número da versão")
+2. Em Opções do desenvolvedor: ative "Depuração USB" E "Depuração sem fio"
+3. Em "Depuração sem fio" → "Parear dispositivo com código de pareamento"
+4. Anote o **IP:PORTA** (ex: 192.168.1.45:37891) e o **CÓDIGO DE 6 DÍGITOS**
+5. Cole no script quando pedir
+6. Depois, informe o IP:PORTA para conexão (geralmente mesmo IP, porta 5555)
+
+TESTE RÁPIDO:
+```bash
+adb devices
+# Deve mostrar: 192.168.x.x:5555  device
+
+adb shell input tap 500 500
+# Toca no meio da tela (teste)
+
+adb shell am start -n com.whatsapp/.Main
+# Abre WhatsApp
+```
+
+SE DER ERRO "connection refused":
+- Verifique se Depuração sem fio está ATIVA
+- Tente: `adb kill-server && adb connect IP:5555`
+- Reinicie o celular se necessário
+
+--------------------------------------------------------------------------------
+6. TESTES ISOLADOS (EXECUTE ANTES DE RODAR O AGENTE)
+================================================================================
+
+TESTE CADA PEÇA SEPARADAMENTE. Se uma falhar, corrija antes de continuar.
+
+```bash
+# 1. TESTE STT (Speech-to-Text)
+python -m tests.test_stt
+# Deve mostrar: "whisper.cpp carregado OK" ou "Vosk carregado OK"
+# Se falhar: verifique se modelo existe em models/stt/
+
+# 2. TESTE LLM (Large Language Model)
+python -m tests.test_llm
+# Deve mostrar: resposta do modelo + "Function calling test"
+# Se falhar: verifique models/llm/ e se llama-cpp-python compilou
+
+# 3. TESTE TTS (Text-to-Speech)
+python -m tests.test_tts
+# Deve TOCAR ÁUDIO: "Olá, sou o ORÁCULO. Teste de voz."
+# Se falhar: verifique models/tts/ e se piper/espeak instalado
+
+# 4. TESTE AUTOMAÇÃO (ADB + Termux:API)
+python -m tests.test_automation
+# Deve mostrar: ADB conectado, Toast, Bateria, Termux:API endpoints
+# Se falhar: rode setup_adb_wireless.sh novamente
+
+# 5. TESTE MEMÓRIA
+python -m tests.test_memory
+# Deve mostrar: adiciona, busca, lista, remove fatos
+```
+
+SE ALGUM TESTE FALHAR:
+- Leia a mensagem de erro (geralmente diz o que falta)
+- Verifique se o modelo/arquivo existe no caminho esperado
+- Rode `bash scripts/install_termux.sh` novamente se precisar
+- Consulte seção 13 (SOLUÇÃO DE PROBLEMAS)
+
+--------------------------------------------------------------------------------
+7. RODANDO O AGENTE ORÁCULO
+================================================================================
+
+MODO ÚNICO COMANDO (padrão):
+```bash
+python -m oraculo
+# Escuta um comando, processa, responde, sai
+```
+
+MODO CONTÍNUO (loop infinito, wake word opcional):
+```bash
+python -m oraculo --continuous
+# Fica ouvindo continuamente
+# Ctrl+C para parar
+```
+
+MODO DIAGNÓSTICO (mostra info do sistema):
+```bash
+python -m oraculo --diagnostico
+```
+
+COM WAKE WORD (precisa config.yaml: wake_word: "oraculo"):
+```bash
+python -m oraculo --continuous
+# Diga "oraculo" + comando
+```
+
+O QUE ACONTECE AO RODAR:
+1. Carrega config.yaml
+2. Inicializa STT, LLM, TTS, Automação, Memória
+3. Ativa wakelock (termux-wake-lock)
+4. Mostra notificação foreground "ORÁCULO Ativo" (Android 12+)
+5. Entra no loop: Grava → Transcreve → LLM → Tools → TTS → Toca
+
+--------------------------------------------------------------------------------
+8. COMANDOS DE VOZ — EXEMPLOS PRÁTICOS
+================================================================================
+
+O agente entende PORTUGUÊS BRASILEIRO COLQUIAL. Exemplos:
+
+WHATSAPP:
+- "manda um zap pra minha mãe falando que tô chegando"
+- "envia mensagem pro pai: 'já vou sair'"
+- "manda no grupo trabalho: 'reunião às 14h'"
+
+MEMÓRIA (APRENDER/ESQUECER):
+- "aprende que minha mãe é a Maria, +55 11 99999-9999, WhatsApp"
+- "guarda que eu gosto de respostas curtas e diretas"
+- "anota que tenho alergia a camarão"
+- "esquece o que falei sobre o João"
+- "apaga o alarme de 6:30 da memória"
+
+CONSULTA MEMÓRIA:
+- "qual o número da minha mãe?"
+- "o que você sabe sobre mim?"
+- "lista meus contatos"
+- "quais são minhas rotinas?"
+
+SISTEMA/ANDROID:
+- "que horas são?"
+- "como tá a bateria?"
+- "cria alarme pra 7 da manhã dias úteis"
+- "tira uma foto"
+- "lê minhas notificações"
+- "abre o WhatsApp"
+- "abre o Chrome"
+
+CONFIGURAÇÃO POR VOZ:
+- "a partir de agora responda mais curto"
+- "use voz mais natural"
+- "não use wake word"
+- "quando eu disser bom dia, leia minhas notificações"
+
+--------------------------------------------------------------------------------
+9. EDITANDO CONFIGURAÇÃO POR VOZ (SEM CÓDIGO, SEM TERMINAL)
+================================================================================
+
+O PRÓPRIO AGENTE EDITA O `config.yaml` QUANDO VOCÊ FALA:
+
+EXEMPLOS:
+| Você fala                                         | O que muda no config.yaml                    |
+|---------------------------------------------------|----------------------------------------------|
+| "a partir de agora responda mais curto"           | llm.max_tokens ↓, temperature ↓              |
+| "responda mais detalhes"                          | llm.max_tokens ↑, temperature ↑              |
+| "use voz mais natural"                            | tts.engine = "piper"                         |
+| "use voz rápida"                                  | tts.engine = "espeak_ng"                     |
+| "não use wake word"                               | orchestrator.wake_word = ""                  |
+| "wake word é óraculo"                             | orchestrator.wake_word = "oraculo"           |
+| "modo contínuo ligado"                            | orchestrator.continuous = true               |
+| "modo contínuo desligado"                         | orchestrator.continuous = false              |
+
+MODO CONFERÊNCIA (ver o que ele sabe):
+- "o que você sabe sobre mim?" → lista tudo da memoria.md
+- "mostra configuração" → lê config.yaml resumido
+
+--------------------------------------------------------------------------------
+10. BLINDAGEM ANDROID 12+ (IMPORTANTE!)
+================================================================================
+
+Sem isso, o Android MATA o processo do agente em background.
+
+PASSO 1 — Wakelock (já automático no código):
+```bash
+# O agente já faz: termux-wake-lock ao iniciar
+# Verifique: termux-wake-lock  # deve dizer "Wake lock acquired"
+```
+
+PASSO 2 — Notificação Foreground (já automática):
+- Aparece "ORÁCULO Ativo" na barra de notificação
+- NÃO ARRASTE PARA LIMPAR — é o que mantém vivo
+
+PASSO 3 — Termux:Boot (início automático ao ligar celular):
+```bash
+# Instala Termux:Boot (F-Droid/GitHub)
+# Cria script de boot:
+mkdir -p ~/.termux/boot
+cat > ~/.termux/boot/oraculo << 'EOF'
+#!/data/data/com.termux/files/usr/bin/bash
+cd /data/data/com.termux/files/home/oraculo-termux
+termux-wake-lock
+python -m oraculo --continuous &
+EOF
+chmod +x ~/.termux/boot/oraculo
+```
+
+PASSO 4 — Desativar Otimização de Bateria (MANUAL, UMA VEZ):
+1. Config → Apps → Termux → Bateria → **Sem restrições** (ou "Não otimizar")
+2. Config → Apps → Termux:API → Bateria → **Sem restrições**
+3. Config → Apps → Termux:Boot → Bateria → **Sem restrições**
+
+PASSO 5 — Exclusão Doze (via ADB, uma vez):
+```bash
+adb shell cmd deviceidle whitelist +com.termux
+adb shell cmd deviceidle whitelist +com.termux.api
+adb shell cmd deviceidle whitelist +com.termux.boot
+```
+
+VERIFICAÇÃO:
+- Deixe o agente rodando, trave a tela, espere 10 min
+- Destrave → agente deve responder ao comando de voz
+
+--------------------------------------------------------------------------------
+11. COMPILANDO APK NO PRÓPRIO CELULAR (BUILDOZER)
+================================================================================
+
+> ⚠️ LEVA 20-60 MINUTOS. CONSOME MUITA BATERIA. USE CARREGADOR.
+> 📱 NÃO TRAVE A TELA DURANTE O BUILD.
+
+```bash
+cd oraculo-termux
+bash scripts/build_apk.sh
+```
+
+O QUE O SCRIPT FAZ:
+1. Instala OpenJDK 17, Android SDK, NDK, Buildozer, Cython
+2. Configura buildozer.spec (já pronto no projeto)
+3. Roda: `buildozer -v android debug`
+4. Gera: `bin/oraculo-1.0.0-arm64-v8a-debug.apk`
+5. Pergunta se quer instalar (abre instalador Android)
+
+SE DER ERRO NO BUILD:
+```bash
+# Ver log completo
+cat build.log | tail -100
+
+# Erros comuns e fix:
+# - "SDK license not accepted" → buildozer já aceita auto
+# - "ndk version not found" → buildozer baixa auto
+# - "Out of memory" → feche outros apps, use swap (termux-create-swap)
+# - "java heap space" → export GRADLE_OPTS="-Xmx2g"
+```
+
+APK GERADO:
+- `bin/oraculo-1.0.0-arm64-v8a-debug.apk` (~50-100 MB)
+- Instala como app normal (ícone na gaveta)
+- Rode: `termux-open bin/oraculo-*.apk`
+
+--------------------------------------------------------------------------------
+12. BACKUP E RESTAURAÇÃO
+================================================================================
+
+BACKUP (memória + config + modelos vetoriais + logs recentes):
+```bash
+bash scripts/backup.sh
+# Cria: backups/oraculo_backup_YYYYMMDD_HHMMSS.tar.gz
+```
+
+RESTAURAÇÃO:
+```bash
+bash scripts/restore.sh
+# Lista backups → escolha um → confirma → restaura
+```
+
+BACKUP MANUAL (apenas memoria.md + perfil.md + config.yaml):
+```bash
+mkdir -p ~/oraculo_backup_manual
+cp memoria.md perfil.md config.yaml ~/oraculo_backup_manual/
+cp -r memory/ ~/oraculo_backup_manual/  # se usa vector memory
+```
+
+--------------------------------------------------------------------------------
+13. SOLUÇÃO DE PROBLEMAS — 15 ERROS COMUNS
+================================================================================
+
+| # | Sintoma | Causa | Comando de Correção |
+|---|---------|-------|---------------------|
+| 1 | `termux-api: not found` | Termux:API não instalado | `pkg install termux-api` + instale app F-Droid |
+| 2 | `adb: command not found` | android-tools não instalado | `pkg install android-tools` |
+| 3 | `whisper.cpp not found` | Não compilou | `bash scripts/install_termux.sh` (recompila) |
+| 4 | `Model not found: models/llm/...` | Modelo não baixou | `bash scripts/download_models.sh --llm qwen2.5-3b-q4` |
+| 5 | `ADB connection refused` | Depuração sem fio off | `bash scripts/setup_adb_wireless.sh` |
+| 6 | `Permission denied: termux-microphone-record` | Permissão microfone | Config → Apps → Termux → Permissões → Microfone: Permitir |
+| 7 | `llama-cpp-python import error` | Compilação falhou | `pip install llama-cpp-python --no-binary llama-cpp-python -v` |
+| 8 | `sqlite-vec extension not found` | Não instalou | `pip install sqlite-vec` (precisa compilar) |
+| 9 | `Piper model not found` | Modelo .onnx faltando | `bash scripts/download_models.sh --tts piper_medium` |
+| 10 | `Audio record failed` | Outro app usando microfone | Feche gravadores, reinicie Termux |
+| 11 | `Agent killed in background` | Phantom killer Android 12+ | Seção 10 (Blindagem completa) |
+| 12 | `WhatsApp não envia` | UI mudou / seletor errado | Verifique `config.yaml` → whatsapp.ui_selectors |
+| 13 | `TTS não toca` | termux-media-player falha | `pkg install termux-api` + teste `termux-media-player play file.wav` |
+| 14 | `Out of memory (OOM)` | Modelo grande p/ RAM | Use modelo menor (phi-4-mini-q4, whisper_tiny) |
+| 15 | `Config.yaml error` | YAML inválido | `python -c "import yaml; yaml.safe_load(open('config.yaml'))"` |
+
+COMANDOS ÚTEIS DE DIAGNÓSTICO:
+```bash
+# Info completa do sistema
+python -m oraculo --diagnostico
+
+# Ver logs do agente
+tail -f oraculo.log
+
+# Ver processos Termux
+ps aux | grep -E "python|adb|termux"
+
+# Memória RAM
+free -h
+
+# Espaço disco
+df -h /data
+
+# Versões
+python --version
+adb version
+termux-api --help | head -1
+```
+
+--------------------------------------------------------------------------------
+14. ADICIONANDO NOVAS FUNCIONALIDADES
+================================================================================
+
+O projeto é MODULAR. Para adicionar coisas:
+
+A) NOVA ENGINE STT/TTS/LLM:
+1. Crie arquivo em `oraculo/stt/`, `oraculo/tts/` ou `oraculo/llm/`
+2. Herde da base (`STTEngine`, `TTSEngine`, `LLMEngine`)
+3. Implemente: `load()`, `transcribe()`/`synthesize()`/`generate()`, `unload()`
+4. Registre: `register_engine("nome", SuaClasse)`
+5. Adicione em `config.yaml` e teste
+
+B) NOVA FERRAMENTA (FUNCTION CALLING):
+1. Em `oraculo/llm/tools.py`: adicione definição JSON no formato OpenAI
+2. Em `oraculo/memory/tools.py` ou `oraculo/automation/`: implemente a função
+3. Adicione em `ALL_TOOLS` e categoria (`memoria`, `automacao`, `sistema`)
+4. Teste: `python -c "from oraculo.memory.tools import execute_memory_tool; print(execute_memory_tool('memoria_adicionar', {...}))"`
+
+C) NOVA AÇÃO AUTOMAÇÃO:
+1. Em `oraculo/automation/adb.py` ou `termux_api.py`: adicione método `_sua_acao`
+2. Registre no `execute_action` dispatch
+3. Adicione tool definition em `oraculo/llm/tools.py`
+4. Teste isolado
+
+D) NOVO CAMPO NA MEMÓRIA:
+- Edite `memoria.md` diretamente (formato Markdown simples)
+- Ou fale: "aprende que [seção] [chave] [valor]"
+
+--------------------------------------------------------------------------------
+15. RESET TOTAL (SE BAGUNÇAR TUDO)
+================================================================================
+
+```bash
+cd oraculo-termux
+bash scripts/reset.sh
+# Digite EXATAMENTE: RESET
+# Faz backup automático antes de apagar
+# Recria memoria.md, perfil.md, pastas models/, memory/, logs/, backups/
+# Mantém código fonte (Git)
+```
+
+DEPOIS DO RESET:
+1. `bash scripts/download_models.sh --all` (ou sua combinação)
+2. `bash scripts/setup_adb_wireless.sh`
+3. `python -m tests.test_stt` (etc.)
+4. Edite `config.yaml` e `perfil.md` se necessário
+
+--------------------------------------------------------------------------------
+16. ESTRUTURA DE ARQUIVOS — O QUE CADA COISA FAZ
+================================================================================
+
+```
+oraculo-termux/
+├── config.yaml           ← CONFIGURAÇÃO CENTRAL (edite aqui ou por voz)
+├── memoria.md            ← MEMÓRIA DE FATOS (editável por voz: "aprende que...")
+├── perfil.md             ← SEU PERFIL (nome, cidade, preferências)
+├── requirements.txt      ← Dependências Python (pip install -r)
+├── buildozer.spec        ← Config build APK (Buildozer)
+├── scripts/
+│   ├── install_termux.sh     ← Instala TUDO no Termux (dependências, compila)
+│   ├── download_models.sh    ← Baixa modelos do Hugging Face
+│   ├── setup_adb_wireless.sh ← Pareamento ADB sem fio no celular
+│   ├── build_apk.sh          ← Compila APK no celular (Buildozer)
+│   ├── backup.sh             ← Backup memória + config + vetores
+│   ├── restore.sh            ← Restaura backup
+│   └── reset.sh              ← Limpa tudo (CUIDADO!)
+├── oraculo/
+│   ├── main.py           ← Entry point (python -m oraculo)
+│   ├── config.py         ← Carrega config.yaml → objetos Python
+│   ├── stt/              ← Speech-to-Text (whisper.cpp, Vosk, termux-stt)
+│   ├── llm/              ← LLM local (llama.cpp GGUF + function calling)
+│   ├── tts/              ← Text-to-Speech (Piper, espeak-ng, Sherpa-ONNX)
+│   ├── memory/           ← Memória (arquivo Markdown + sqlite-vec RAG)
+│   ├── automation/       ← Android (ADB Wireless, Termux:API, WhatsApp)
+│   ├── orchestrator/     ← Loop principal + wakelock + estado
+│   └── utils/            ← Logger, áudio, helpers sistema
+├── models/               ← Modelos baixados (gitignored)
+│   ├── llm/              ← .gguf (Qwen, Llama, Gemma, Phi)
+│   ├── stt/              ← .bin (whisper.cpp) ou pasta Vosk
+│   ├── tts/              ← .onnx + .json (Piper) ou espeak (sem modelo)
+│   └── embeddings/       ← .onnx (all-MiniLM-L6-v2 para RAG)
+├── memory/               ← Banco vetorial sqlite-vec (gitignored)
+├── tests/                ← Testes isolados por componente
+└── .github/workflows/    ← CI/CD (GitHub Actions)
+```
+
+--------------------------------------------------------------------------------
+ARQUIVOS QUE VOCÊ PODE/MUST EDITAR MANUALMENTE
+--------------------------------------------------------------------------------
+
+| Arquivo              | Quando editar                                    |
+|----------------------|--------------------------------------------------|
+| `config.yaml`        | Trocar engine, ajustar parâmetros, caminhos      |
+| `memoria.md`         | Ver/editar memória manualmente (formato Markdown)|
+| `perfil.md`          | Preencher seu nome, cidade, preferências         |
+| `buildozer.spec`     | Mudar nome do app, ícone, permissões Android     |
+
+> DICA: Prefira editar POR VOZ ("aprende que...", "a partir de agora...")
+> Só edite manualmente se souber o que está fazendo.
+
+--------------------------------------------------------------------------------
+COMANDOS RÁPIDOS DE REFERÊNCIA (COPIE E COLE)
+--------------------------------------------------------------------------------
+
+```bash
+# === INSTALAÇÃO COMPLETA (copie tudo de uma vez) ===
+pkg update && pkg upgrade -y && pkg install -y git python ffmpeg sox termux-api android-tools clang cmake make && git clone https://github.com/SEU_USUARIO/oraculo-termux.git && cd oraculo-termux && chmod +x scripts/*.sh && bash scripts/install_termux.sh
+
+# === BAIXAR MODELOS EQUILIBRADOS ===
+bash scripts/download_models.sh --llm qwen2.5-3b-q4 --stt whisper_base --tts piper_medium --embeddings
+
+# === CONFIGURAR ADB WIRELESS ===
+bash scripts/setup_adb_wireless.sh
+
+# === TESTAR TUDO ===
+python -m tests.test_stt && python -m tests.test_llm && python -m tests.test_tts && python -m tests.test_automation && python -m tests.test_memory
+
+# === RODAR AGENTE ===
+python -m oraculo --continuous
+
+# === COMPILAR APK ===
+bash scripts/build_apk.sh
+
+# === BACKUP ===
+bash scripts/backup.sh
+
+# === DIAGNÓSTICO ===
+python -m oraculo --diagnostico
+
+# === RESET (CUIDADO!) ===
+bash scripts/reset.sh
+```
+
+--------------------------------------------------------------------------------
+DICAS FINAIS
+--------------------------------------------------------------------------------
+
+1. **SEMPRE TESTE ISOLADO** antes de rodar o agente completo
+2. **MANTENHA O CELULAR CARREGANDO** durante instalação/build
+3. **NÃO TRAVE A TELA** durante builds longos (use `termux-wake-lock`)
+4. **USE F-DROID** para Termux, Termux:API, Termux:Boot, F-Droid
+5. **BACKUP ANTES DE MEXER** em configuração ou memória
+6. **LEIA OS LOGS** (`oraculo.log` e `tail -f oraculo.log`)
+7. **MODELO QWEN2.5-3B-Q4** é o melhor custo/benefício para pt-BR
+8. **WHATSAPP SÓ FUNCIONA COM ADB WIRELESS** configurado corretamente
+9. **ANDROID 12+ EXIGE BLINDAGEM** (seção 10) — não pule!
+10. **DÚVIDAS?** Abra Issue no GitHub com: modelo celular, Android, RAM, log do erro
+
+--------------------------------------------------------------------------------
+LICENÇA: MIT — Use, modifique, distribua livremente.
+PROJETO: https://github.com/SEU_USUARIO/oraculo-termux
+================================================================================

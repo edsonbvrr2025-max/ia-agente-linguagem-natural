@@ -1,0 +1,55 @@
+# ORÁCULO — Dependências Python
+# Instale no Termux: pip install -r requirements.txt
+
+# Core
+pyyaml>=6.0.1
+python-dotenv>=1.0.0
+
+# LLM - llama.cpp Python bindings
+# Instalação no Termux: pip install llama-cpp-python --extra-index-url=https://abetlen.github.io/llama-cpp-python/whl/cpu
+# Para Vulkan: pip install llama-cpp-python --extra-index-url=https://abetlen.github.io/llama-cpp-python/whl/vulkan
+llama-cpp-python>=0.2.90
+
+# STT
+# whisper.cpp Python bindings
+# Instalação: pip install whisper-cpp-python
+# Ou compile whisper.cpp e use subprocess (mais leve)
+# whisper-cpp-python>=1.0.0
+
+# Vosk (alternativa STT)
+# vosk>=0.3.45
+
+# TTS
+# Piper TTS Python
+# piper-tts>=1.2.0
+
+# Sherpa-ONNX (alternativa TTS/STT)
+# sherpa-onnx>=1.10.0
+
+# Audio
+# sounddevice para gravação/playback (opcional, usa termux-microphone-record por padrão)
+# sounddevice>=0.4.6
+# scipy>=1.11.0
+
+# Automação ADB
+pure-python-adb>=0.2.0
+
+# Vector Memory (RAG local)
+# sqlite-vec precisa compilação — no Termux use pip install sqlite-vec
+# sqlite-vec>=0.1.6
+# onnxruntime para embeddings
+# onnxruntime>=1.17.0
+
+# Utilidades
+rich>=13.7.0          # Logs coloridos, progress bars
+tqdm>=4.66.0          # Progress bars downloads
+requests>=2.31.0      # HTTP downloads
+psutil>=5.9.0         # Info sistema (RAM, CPU, bateria)
+
+# Testes
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+
+# Buildozer (para compilar APK) — instale separadamente no Termux
+# buildozer>=1.5.0
+# cython>=3.0.0

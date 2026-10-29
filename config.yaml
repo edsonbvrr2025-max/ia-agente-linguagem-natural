@@ -1,0 +1,211 @@
+# ORÁCULO — Configuração Central
+# Edite este arquivo ou use comandos de voz para alterar: "a partir de agora responda mais curto"
+
+# =============================================================================
+# STT (Speech-to-Text) — Ouvido
+# =============================================================================
+stt:
+  # Engine: whisper_cpp | vosk | termux_stt
+  # whisper_cpp = melhor precisão pt-BR, precisa modelo GGML
+  # vosk = bom offline, modelo maior (~1.2GB)
+  # termux_stt = usa API do sistema Android, zero setup, menos preciso
+  engine: "whisper_cpp"
+
+  # Caminho do modelo (baixado por scripts/download_models.sh)
+  model: "models/stt/ggml-base-pt-br.bin"
+
+  # Idioma (whisper.cpp)
+  language: "pt"
+
+  # Detecção de fim de fala por silêncio
+  silence_threshold: 0.02      # Nível de ruído (0.0-1.0)
+  silence_duration: 1.5        # Segundos de silêncio para parar
+
+  # Whisper.cpp específico
+  whisper:
+    n_threads: 4
+    translate: false           # false = transcreve, true = traduz para inglês
+    no_timestamps: true
+    print_progress: false
+
+# =============================================================================
+# LLM (Large Language Model) — Cérebro
+# =============================================================================
+llm:
+  # Engine: llama_cpp (única suportada atualmente)
+  engine: "llama_cpp"
+
+  # Modelo GGUF (baixado por scripts/download_models.sh)
+  # Opções recomendadas:
+  # - models/llm/qwen2.5-3b-instruct-q4_k_m.gguf
+  # - models/llm/llama-3.2-3b-instruct-q4_k_m.gguf
+  # - models/llm/gemma-3-4b-it-q4_k_m.gguf
+  # - models/llm/phi-4-mini-instruct-q4_k_m.gguf
+  model: "models/llm/qwen2.5-3b-instruct-q4_k_m.gguf"
+
+  # Contexto (tokens) — 4096 é seguro para 3B-4B models
+  n_ctx: 4096
+
+  # GPU offload (-1 = máximo, 0 = só CPU)
+  # Vulkan/Adreno funciona no Termux via llama.cpp compilado com GGML_VK=ON
+  n_gpu_layers: -1
+
+  # Threads CPU (ajuste para seus núcleos: 4 para 8-core, 2 para 4-core)
+  threads: 4
+
+  # Amostragem
+  temperature: 0.3
+  top_p: 0.9
+  top_k: 40
+  repeat_penalty: 1.1
+
+  # Function calling
+  function_calling: true
+  parallel_tool_calls: false
+
+# =============================================================================
+# TTS (Text-to-Speech) — Boca
+# =============================================================================
+tts:
+  # Engine: piper | espeak_ng | sherpa_onnx
+  # piper = melhor qualidade natural, modelo ~50MB
+  # espeak_ng = robótico, instantâneo, zero modelo extra
+  # sherpa_onnx = alta qualidade, modelo ~80MB
+  engine: "piper"
+
+  # Modelo Piper (baixado por scripts/download_models.sh)
+  model: "models/tts/pt_BR-faber-medium.onnx"
+
+  # Speaker ID (para modelos multi-speaker)
+  speaker: 0
+
+  # Velocidade (0.5 a 2.0)
+  speed: 1.0
+
+  # Piper específico
+  piper:
+    length_scale: 1.0
+    noise_scale: 0.667
+    noise_w: 0.8
+
+# =============================================================================
+# Automação — Mãos
+# =============================================================================
+automation:
+  # Método principal: adb | termux_api | accessibility
+  # adb = mais confiável para WhatsApp (input tap/text, uiautomator)
+  # termux_api = nativo Termux, limitado (notificações, contatos, SMS)
+  # accessibility = AccessibilityService, precisa app separado
+  method: "adb"
+
+  # ADB Wireless (configurado por scripts/setup_adb_wireless.sh)
+  adb_host: "127.0.0.1"
+  adb_port: 5555
+  adb_timeout: 30
+
+  # Verificação obrigatória: nunca confirme ação sem ver resultado na tela
+  verify_actions: true
+
+  # Termux:API endpoints
+  termux_api:
+    notification: true
+    contact: true
+    sms: true
+    alarm: true
+    camera: true
+    clipboard: true
+    toast: true
+    vibration: true
+
+  # AccessibilityService (fallback)
+  accessibility:
+    enabled: false
+    service_package: "com.seuapp.accessibility"
+    service_class: "com.seuapp.accessibility.MyAccessibilityService"
+
+# =============================================================================
+# Memória — Cérebro Persistente
+# =============================================================================
+memory:
+  # Arquivos de memória em linguagem natural
+  file_path: "memoria.md"
+  profile_path: "perfil.md"
+
+  # Busca vetorial (RAG local) — opcional, consome ~50MB RAM extra
+  use_vector: true
+  vector_db: "memory/vectors.db"
+  embedding_model: "models/embeddings/all-MiniLM-L6-v2.onnx"
+  top_k: 3                  # Quantos fatos recuperar por query
+  similarity_threshold: 0.7 # Limite de similaridade (0-1)
+
+  # Formato do arquivo memoria.md (não mude — o agente espera este formato)
+  format_version: "1.0"
+
+# =============================================================================
+# Orquestrador — Loop Principal
+# =============================================================================
+orchestrator:
+  # Palavra de ativação (opcional, desative com string vazia "")
+  # Requer STT rodando continuamente (consome mais bateria)
+  wake_word: "oraculo"
+
+  # Modo contínuo: mantém conversa sem precisar repetir wake word
+  continuous: false
+
+  # Permite interromper fala do agente com novo comando de voz
+  interruptible: true
+
+  # Histórico de conversa (pares user/assistant) no contexto do LLM
+  max_history: 6
+
+  # Wakelock (impede Android de dormir CPU)
+  wakelock: true
+
+  # Notificação foreground (mantém processo vivo no Android 12+)
+  foreground_notification: true
+  notification_title: "ORÁCULO Ativo"
+  notification_text: "Toque para abrir / Diga 'oraculo'"
+
+  # Timeouts
+  stt_timeout: 10           # Segundos esperando fala
+  llm_timeout: 60           # Segundos para resposta do LLM
+  tts_timeout: 30           # Segundos para síntese
+  action_timeout: 45        # Segundos para automação completar
+
+# =============================================================================
+# WhatsApp Específico
+# =============================================================================
+whatsapp:
+  # Nome do pacote (não mude)
+  package: "com.whatsapp"
+  # Activity principal
+  activity: "com.whatsapp.Main"
+
+  # Seletores UI (podem mudar com atualizações do WhatsApp)
+  # O agente usa uiautomator dump + XPath para localizar
+  ui_selectors:
+    search_box: "//*[@resource-id='com.whatsapp:id/search_box' or @content-desc='Buscar']"
+    chat_list: "//*[@resource-id='com.whatsapp:id/chat_list']"
+    message_input: "//*[@resource-id='com.whatsapp:id/entry' or @content-desc='Mensagem']"
+    send_button: "//*[@resource-id='com.whatsapp:id/send' or @content-desc='Enviar']"
+    message_bubble: "//*[@resource-id='com.whatsapp:id/message_text']"
+
+  # Delays (ms) entre ações — ajuste se seu celular for mais lento
+  delays:
+    open_app: 2000
+    search_contact: 1500
+    open_chat: 1000
+    focus_input: 500
+    type_message: 1000
+    tap_send: 500
+    verify_sent: 2000
+
+# =============================================================================
+# Logging
+# =============================================================================
+logging:
+  level: "INFO"             # DEBUG | INFO | WARNING | ERROR
+  file: "oraculo.log"
+  max_size_mb: 10
+  backup_count: 3
+  console_colors: true
